@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Rustlike — a browser survival game</title>
+  <link rel="stylesheet" href="./src/ui/style.css" />
+  <!--
+    No build step. Modules are loaded directly by the browser via an import map.
+    Three.js and the addons we use are vendored under /vendor so the game runs
+    fully offline behind a plain static file server.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.js",
+      "three/addons/": "./vendor/three/addons/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- Crosshair -->
+  <div id="crosshair"></div>
+
+  <!-- Damage / feedback vignette -->
+  <div id="hurt-flash"></div>
+
+  <!-- HUD: survival stats -->
+  <div id="hud">
+    <div class="vitals">
+      <div class="vital" data-vital="health"><span class="ico">✚</span><div class="bar"><div class="fill"></div></div></div>
+      <div class="vital" data-vital="hunger"><span class="ico">🍖</span><div class="bar"><div class="fill"></div></div></div>
+      <div class="vital" data-vital="thirst"><span class="ico">💧</span><div class="bar"><div class="fill"></div></div></div>
+      <div class="vital" data-vital="temp"><span class="ico">🌡</span><div class="bar"><div class="fill"></div></div></div>
+    </div>
+  </div>
+
+  <!-- Hotbar -->
+  <div id="hotbar"></div>
+
+  <!-- Interaction prompt -->
+  <div id="prompt"></div>
+
+  <!-- Clock / status line -->
+  <div id="statusline"><span id="clock">06:00</span></div>
+
+  <!-- Inventory + crafting screen -->
+  <div id="inventory-screen" class="hidden">
+    <div class="panel inv-panel">
+      <h2>Inventory</h2>
+      <div id="inv-grid" class="grid"></div>
+      <h2>Wear</h2>
+      <div id="inv-wear" class="grid small"></div>
+    </div>
+    <div class="panel craft-panel">
+      <h2>Crafting</h2>
+      <div id="craft-list"></div>
+    </div>
+    <div class="panel ext-panel hidden" id="ext-panel">
+      <h2 id="ext-title">Container</h2>
+      <div id="ext-grid" class="grid"></div>
+    </div>
+  </div>
+
+  <!-- Held cursor stack for drag/drop -->
+  <div id="cursor-stack" class="hidden"></div>
+
+  <!-- Death screen -->
+  <div id="death-screen" class="hidden">
+    <h1>YOU DIED</h1>
+    <p id="death-cause"></p>
+    <button id="respawn-btn">Respawn</button>
+  </div>
+
+  <!-- Start / pointer-lock overlay -->
+  <div id="start-screen">
+    <div class="start-card">
+      <h1>RUSTLIKE</h1>
+      <p class="tag">A from-scratch browser survival game — procedural world &amp; models, PBR rendering.</p>
+      <div id="loading">Loading…</div>
+      <button id="play-btn" class="hidden">Click to play</button>
+      <div class="controls">
+        <div><b>WASD</b> move · <b>Shift</b> sprint · <b>Ctrl</b> crouch · <b>Space</b> jump</div>
+        <div><b>Mouse</b> look · <b>LMB</b> use/attack · <b>RMB</b> alt (place/aim)</div>
+        <div><b>1–6</b> hotbar · <b>Wheel</b> select · <b>Tab</b> inventory · <b>E</b> interact</div>
+        <div><b>F</b> flashlight/torch · <b>R</b> rotate build · <b>G</b> drop</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

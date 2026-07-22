@@ -1,0 +1,7 @@
+# Local dev tooling
+node_modules/
+.DS_Store
+*.log
+
+# Playwright / screenshot scratch
+.tmp/

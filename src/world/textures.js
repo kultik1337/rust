@@ -92,9 +92,9 @@ export function makeGroundTextures() {
 
   const normal = normalFromHeight(h, size, 2.6);
   return {
-    map: toTexture(ac, 40, true),
-    roughnessMap: toTexture(rc, 40),
-    normalMap: toTexture(normal, 40),
+    map: toTexture(ac, 1, true),
+    roughnessMap: toTexture(rc, 1),
+    normalMap: toTexture(normal, 1),
   };
 }
 

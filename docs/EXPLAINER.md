@@ -314,6 +314,49 @@ is the highest-value place to spend attention before building on top.
 
 ---
 
+## Revision 2 — feedback fixes & extras
+
+After the first playthrough, six issues were addressed:
+
+1. **Forest performance.** Two things were slow: too many draw calls, and — more
+   importantly — a per-frame raycast against the *entire* scene (including the
+   ~166k-triangle terrain) for the interaction prompt and melee.
+   - Each resource is now collapsed to **one mesh per material** (`models/merge.js`)
+     via `mergeGeometries`, so a pine goes from ~6 draw calls to 2.
+   - Distance **culling** hides resources beyond 165 m and only lets those within
+     70 m cast shadows (`world/resources.js`); animals beyond 190 m are skipped.
+   - Raycasts now target only **nearby** interactables, terrain placement is done
+     by **ray-marching** the analytic height field instead of the mesh, and the
+     prompt is throttled.
+
+   > **Measured (dense forest, 393 resources within 60 m):** CPU update time
+   > **45 ms → 0.9 ms** and world draw calls cut to ~950 (from several thousand).
+
+2. **Ground texture** now uses **world-space UVs** (a fixed ~5 m tile) instead of
+   stretching one tile across the whole island, with softened detail and a lower
+   normal scale — so it reads crisp underfoot.
+
+3. **Animals walked sideways** because the model's forward axis (+X) didn't match
+   the heading convention (+Z). Fixed with a −90° yaw offset.
+
+4. **Hands** were rebuilt: a rounded palm, knuckles, tapered two-segment fingers
+   and a wrapping thumb (`models/viewmodel.js`), and the hatchet got a proper
+   triangular stone blade.
+
+5. **Inventory** was redesigned: a clear Inventory grid with a separate,
+   interactive **Belt** row you can drag items to/from, a Wearing panel, hover
+   **tooltips**, and crafting rows that show costs and grey out what you can't
+   afford.
+
+6. **Extras (for fun):**
+   - **Procedural audio** (`systems/audio.js`) — every sound is synthesised with
+     the Web Audio API (ambient wind that thickens at night, footsteps, tool hits,
+     pickup, craft, bow, hurt, and fire crackle). No audio files.
+   - **Particles** (`systems/particles.js`) — wood chips / stone shards on hits,
+     rising campfire embers, and water splashes.
+   - **Drifting clouds**, a **compass** strip, **fall damage**, and a pulsing
+     **low-health vignette**.
+
 ## Quiz
 
 <details>

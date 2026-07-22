@@ -17,21 +17,25 @@ function handle(len = 0.9, r = 0.028) {
 
 export function buildHatchet() {
   const g = new THREE.Group();
-  const h = handle(0.92, 0.03);
-  h.position.y = 0.1;
+  const h = handle(0.9, 0.028);
+  h.position.y = 0.12;
   g.add(h);
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.05), stoneHeadMat());
-  head.position.set(0.08, 0.5, 0);
-  head.rotation.z = -0.35;
-  // Bevel the blade edge.
-  head.geometry = new THREE.CylinderGeometry(0.02, 0.14, 0.22, 4);
-  head.rotation.set(0, Math.PI / 4, -1.2);
-  head.position.set(0.09, 0.5, 0);
+  // Head near the top: a poll block + a triangular stone blade.
+  const head = new THREE.Group();
+  head.position.set(0, 0.52, 0);
+  const poll = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.11, 0.07), stoneHeadMat());
+  head.add(poll);
+  const blade = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.135, 0.26, 3), stoneHeadMat());
+  blade.rotation.z = -Math.PI / 2;       // lay the wedge along +X
+  blade.scale.set(1, 1, 0.42);           // flatten into a blade
+  blade.position.set(0.13, 0, 0);
+  head.add(blade);
+  head.rotation.z = -0.22;
   g.add(head);
-  const bind = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.08, 8), bindingMat());
+  const bind = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.09, 8), bindingMat());
   bind.position.y = 0.5;
   g.add(bind);
-  g.userData.grip = new THREE.Vector3(0, 0.05, 0);
+  g.userData.grip = new THREE.Vector3(0, 0.08, 0);
   return g;
 }
 

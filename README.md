@@ -28,6 +28,12 @@ assets from Rust or any other commercial game.
   (respawn point) and storage box.
 - **Animals with AI** — deer, boar, chickens, wolves and bears with wander / flee
   / chase / attack behaviours; melee and bow combat.
+- **Procedural audio** — ambient wind, footsteps, tool hits, pickup, craft, bow,
+  hurt and fire crackle, all synthesised with the Web Audio API (no audio files).
+- **Atmosphere & feedback** — drifting clouds, particle debris/embers/splashes, a
+  compass, fall damage, and a low-health vignette.
+- **Optimised for dense forest** — per-material mesh merging, distance culling and
+  cheap ray-marched targeting keep it smooth (see the explainer for measurements).
 
 ## Running
 

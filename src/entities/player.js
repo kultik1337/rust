@@ -101,6 +101,7 @@ export class Player {
     }
 
     // --- Integrate + collide ---
+    const wasGrounded = this.grounded;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
     const headY = this.pos.y + this.standHeight;
@@ -109,8 +110,13 @@ export class Player {
     this.pos.y += this.vel.y * dt;
     const ground = this.physics.supportHeight(this.pos.x, this.pos.z, this.pos.y);
     if (this.pos.y <= ground) {
+      const impact = -this.vel.y;             // downward speed at the moment of landing
       this.pos.y = ground;
       if (this.vel.y < 0) this.vel.y = 0;
+      // Fall damage above a safe threshold (never in water).
+      if (!wasGrounded && !this.inWater && impact > 16 && this.takeDamage) {
+        this.takeDamage((impact - 16) * 3.5, 'the fall');
+      }
       this.grounded = true;
     } else {
       this.grounded = false;

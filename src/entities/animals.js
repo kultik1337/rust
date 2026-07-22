@@ -125,7 +125,9 @@ class Animal {
     pos.x += Math.sin(this.heading) * this.speed * dt;
     pos.z += Math.cos(this.heading) * this.speed * dt;
     pos.y = Math.max(this.terrain.heightAt(pos.x, pos.z), 0);
-    this.mesh.rotation.y = this.heading;
+    // The model's "front" is +X, but our heading convention has forward at +Z,
+    // so offset by -90° — otherwise animals appear to walk sideways.
+    this.mesh.rotation.y = this.heading - Math.PI / 2;
 
     // --- Leg / head animation ---
     this.phase += dt * (2 + this.speed * 2.2);
@@ -177,9 +179,14 @@ export class AnimalManager {
   }
 
   update(dt, player, spawnDrop) {
+    const cull2 = 190 * 190;
     for (let i = this.animals.length - 1; i >= 0; i--) {
       const a = this.animals[i];
-      a.update(dt, player);
+      // Skip far animals entirely (both update + render) for performance.
+      const dx = a.mesh.position.x - player.pos.x, dz = a.mesh.position.z - player.pos.z;
+      const far = dx * dx + dz * dz > cull2;
+      a.mesh.visible = !far;
+      if (!far) a.update(dt, player);
       if (a.dead && a.deadTimer <= 0) {
         // Drop loot and despawn corpse.
         if (spawnDrop) for (const [id, n] of Object.entries(a.def.loot)) spawnDrop(id, n, a.mesh.position);

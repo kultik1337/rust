@@ -9,8 +9,8 @@ const HAND = { chop: 2, mine: 2, gather: 3 };   // bare-hand gathering power
 
 // Melee gathering/attacks (raycast from the crosshair) and bow projectiles.
 export class CombatSystem {
-  constructor({ scene, camera, viewmodel, resources, animals, drops, inventory, terrain, ui }) {
-    Object.assign(this, { scene, camera, viewmodel, resources, animals, drops, inventory, terrain, ui });
+  constructor({ scene, camera, viewmodel, resources, animals, drops, inventory, terrain, ui, particles, audio }) {
+    Object.assign(this, { scene, camera, viewmodel, resources, animals, drops, inventory, terrain, ui, particles, audio });
     this.ray = new THREE.Raycaster();
     this.ray.far = REACH;
     this.cooldown = 0;
@@ -39,10 +39,28 @@ export class CombatSystem {
     setTimeout(() => this._resolveMelee(held), 90);
   }
 
+  // Only nearby resources/animals are candidates — never raycast the whole
+  // scene (the terrain alone is ~166k triangles).
+  _candidates() {
+    const list = [];
+    const c = this.camera.position; const r2 = (REACH + 2) * (REACH + 2);
+    for (const g of this.resources.resources) {
+      if (!g.visible || g.userData.dead) continue;
+      const dx = g.position.x - c.x, dz = g.position.z - c.z;
+      if (dx * dx + dz * dz < r2) list.push(g);
+    }
+    for (const a of this.animals.animals) {
+      if (a.dead) continue;
+      const dx = a.mesh.position.x - c.x, dz = a.mesh.position.z - c.z;
+      if (dx * dx + dz * dz < r2) list.push(a.mesh);
+    }
+    return list;
+  }
+
   _resolveMelee(held) {
     const def = held?.def;
     this.ray.set(this.camera.position, this.camera.getWorldDirection(new THREE.Vector3()));
-    const hits = this.ray.intersectObjects(this.scene.children, true);
+    const hits = this.ray.intersectObjects(this._candidates(), true);
     for (const h of hits) {
       if (h.distance > REACH) break;
       const root = findEntityRoot(h.object);
@@ -59,6 +77,12 @@ export class CombatSystem {
           }
           this._wearTool(held);
           this.ui.hitmarker();
+          // Debris + sound cued to the resource kind.
+          const color = cat === 'chop' ? 0x7a5230 : cat === 'mine' ? 0x8b877e : 0x4e7a2a;
+          this.particles?.burst(h.point, color, 9, 3, 2.6);
+          if (cat === 'chop') this.audio?.chop();
+          else if (cat === 'mine') this.audio?.mine();
+          else this.audio?.gather();
         }
         return;
       }
@@ -68,6 +92,8 @@ export class CombatSystem {
           ent.hurt(def?.damage ?? 6);
           this._wearTool(held);
           this.ui.hitmarker(true);
+          this.particles?.burst(h.point, 0xb0303a, 8, 3, 2.2);
+          this.audio?.hitFlesh();
         }
         return;
       }
@@ -101,6 +127,7 @@ export class CombatSystem {
     this.scene.add(model);
     this.projectiles.push({ mesh: model, vel: dir.multiplyScalar(48), life: 6 });
     this.viewmodel.swing('attack');
+    this.audio?.bow();
     this._wearTool(held);
     return true;
   }

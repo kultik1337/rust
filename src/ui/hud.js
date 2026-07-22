@@ -4,10 +4,11 @@ import { ITEMS } from '../data/items.js';
 // hotbar, vitals, crafting list, and the inventory/container screens. Also owns
 // the click-to-move drag/drop between containers.
 export class HUD {
-  constructor({ icons, inventory, crafting, getStations, onDropWorld }) {
+  constructor({ icons, inventory, crafting, getStations, onDropWorld, audio }) {
     this.icons = icons;
     this.inv = inventory;
     this.crafting = crafting;
+    this.audio = audio;
     this.getStations = getStations;      // () → Set of station kinds near player
     this.onDropWorld = onDropWorld;      // (stack) → void
 
@@ -20,14 +21,17 @@ export class HUD {
       hurt: document.getElementById('hurt-flash'),
       invScreen: document.getElementById('inventory-screen'),
       invGrid: document.getElementById('inv-grid'),
+      invHotbar: document.getElementById('inv-hotbar'),
       invWear: document.getElementById('inv-wear'),
       craftList: document.getElementById('craft-list'),
+      tooltip: document.getElementById('tooltip'),
       extPanel: document.getElementById('ext-panel'),
       extGrid: document.getElementById('ext-grid'),
       extTitle: document.getElementById('ext-title'),
       cursor: document.getElementById('cursor-stack'),
       death: document.getElementById('death-screen'),
       deathCause: document.getElementById('death-cause'),
+      compassBand: document.getElementById('compass-band'),
     };
 
     this.open = false;
@@ -42,11 +46,39 @@ export class HUD {
         this.el.cursor.style.left = e.clientX + 'px';
         this.el.cursor.style.top = e.clientY + 'px';
       }
+      this._updateTooltip(e);
     });
     this.el.invScreen.addEventListener('mousedown', (e) => this._onScreenClick(e));
 
     this._buildCraftListStructure();
+    this._buildCompass();
     this.renderHotbar();
+  }
+
+  _buildCompass() {
+    this.pxPerDeg = 300 / 90;                 // ~90° visible across the 300px window
+    const band = this.el.compassBand;
+    if (!band) return;
+    band.style.width = (720 * this.pxPerDeg) + 'px';
+    const card = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+    band.innerHTML = '';
+    for (let deg = 0; deg <= 720; deg += 15) {
+      const d = ((deg % 360) + 360) % 360;
+      const t = document.createElement('span');
+      t.className = 'tick' + (card[d] ? ' card' : '');
+      t.textContent = card[d] || '·';
+      t.style.position = 'absolute';
+      t.style.left = (deg * this.pxPerDeg) + 'px';
+      t.style.transform = 'translateX(-50%)';
+      band.appendChild(t);
+    }
+  }
+
+  setCompass(yaw) {
+    if (!this.el.compassBand) return;
+    const bearing = (((-yaw * 180 / Math.PI) % 360) + 360) % 360;
+    const offset = 150 - (bearing + 360) * this.pxPerDeg;
+    this.el.compassBand.style.transform = `translateX(${offset}px)`;
   }
 
   // ---- Hotbar ----
@@ -91,6 +123,10 @@ export class HUD {
     if (sv.temp < 25) tp.style.background = 'linear-gradient(#7fc8ff,#3a7fd0)';
     else if (sv.temp > 90) tp.style.background = 'linear-gradient(#ffae6a,#d0602a)';
     else tp.style.background = 'linear-gradient(#8fd8b0,#5aa070)';
+
+    // Pulsing red vignette when badly hurt.
+    if (sv.health < 30 && sv.alive) this.el.hurt.classList.add('lowhp');
+    else this.el.hurt.classList.remove('lowhp');
   }
 
   setClock(str) { this.el.clock.textContent = str; }
@@ -137,6 +173,7 @@ export class HUD {
     this.open = false;
     this.el.invScreen.classList.add('hidden');
     this.el.extPanel.classList.add('hidden');
+    this.el.tooltip.classList.add('hidden');
     this.extInstance = null;
     if (this.cursorStack) { this._returnCursorToInventory(); }
   }
@@ -151,20 +188,22 @@ export class HUD {
 
   renderScreen() {
     this._renderGrid(this.el.invGrid, this.inv.main, 'main');
+    this._renderGrid(this.el.invHotbar, this.inv.hotbar, 'hotbar', true);
     this._renderWear();
     if (this.extInstance) this._renderGrid(this.el.extGrid, this.extInstance.container, 'ext');
     this.renderCrafting();
-    // Also show the hotbar row inside the inventory for moving items in/out.
+    // Also refresh the always-on bottom hotbar.
     this.renderHotbar();
   }
 
-  _renderGrid(container, model, name) {
+  _renderGrid(container, model, name, keyed = false) {
     container.innerHTML = '';
     for (let i = 0; i < model.size; i++) {
       const s = model.slots[i];
       const slot = document.createElement('div');
-      slot.className = 'slot';
+      slot.className = 'slot' + (keyed && i === this.inv.selected ? ' active' : '');
       slot.dataset.c = name; slot.dataset.i = i;
+      if (keyed) { const k = document.createElement('span'); k.className = 'key'; k.textContent = i + 1; slot.appendChild(k); }
       if (s) this._fillSlot(slot, s);
       container.appendChild(slot);
     }
@@ -202,15 +241,17 @@ export class HUD {
       const name = document.createElement('div'); name.className = 'rname';
       name.textContent = ITEMS[outId].name + (recipe.out[outId] > 1 ? ` ×${recipe.out[outId]}` : '');
       const cost = document.createElement('div'); cost.className = 'rcost';
-      cost.textContent = Object.entries(recipe.cost).map(([id, n]) => `${ITEMS[id].name} ${n}`).join(', ')
-        + (recipe.station ? `  ·  needs ${recipe.station}` : '');
+      cost.innerHTML = Object.entries(recipe.cost).map(([id, n]) => {
+        const miss = this.inv.totalCount(id) < n;
+        return `<span class="${miss ? 'miss' : ''}"><b>${n}</b> ${ITEMS[id].name}</span>`;
+      }).join(' · ') + (recipe.station ? ` · <span class="${stations.has(recipe.station) ? '' : 'miss'}">needs ${recipe.station}</span>` : '');
       meta.appendChild(name); meta.appendChild(cost);
       const btn = document.createElement('button'); btn.className = 'rcraft'; btn.textContent = 'Craft';
       btn.addEventListener('mousedown', (e) => {
         e.stopPropagation();
         const r = this.crafting.craft(recipe, this.getStations());
         if (!r.ok) this.toast(r.reason === 'station' ? `Requires a ${recipe.station}` : 'Not enough materials');
-        else { this.renderScreen(); }
+        else { this.audio?.craft(); this.renderScreen(); }
       });
       row.appendChild(icon); row.appendChild(meta); row.appendChild(btn);
       list.appendChild(row);
@@ -315,6 +356,48 @@ export class HUD {
       const c = document.createElement('span'); c.className = 'count'; c.textContent = this.cursorStack.count;
       el.appendChild(c);
     }
+  }
+
+  _tooltipFor(id) {
+    const d = ITEMS[id];
+    if (!d) return '';
+    const bits = [];
+    if (d.gather) bits.push(`chop ${d.gather.chop} · mine ${d.gather.mine} · gather ${d.gather.gather}`);
+    if (d.damage) bits.push(`damage ${d.damage}`);
+    if (d.ranged) bits.push('ranged');
+    if (d.eat) {
+      const e = d.eat; const p = [];
+      if (e.hunger) p.push(`${e.hunger > 0 ? '+' : ''}${e.hunger} food`);
+      if (e.thirst) p.push(`${e.thirst > 0 ? '+' : ''}${e.thirst} water`);
+      if (e.health) p.push(`${e.health > 0 ? '+' : ''}${e.health} hp`);
+      bits.push(p.join(' · '));
+    }
+    if (d.warmth) bits.push(`+${d.warmth} warmth`);
+    if (d.armor) bits.push(`${d.armor} armor`);
+    if (d.places) bits.push('placeable');
+    const desc = bits.length ? `<div class="tdesc">${bits.join('<br>')}</div>` : '';
+    return `<div class="tname">${d.name}</div><div class="tcat">${d.category}</div>${desc}`;
+  }
+
+  _updateTooltip(e) {
+    const tip = this.el.tooltip;
+    if (!this.open) { tip.classList.add('hidden'); return; }
+    const slotEl = e.target.closest?.('.slot');
+    let id = null;
+    if (slotEl && slotEl.dataset.c) {
+      const name = slotEl.dataset.c;
+      if (name === 'wear') id = this.inv.wear[slotEl.dataset.i]?.id;
+      else { const c = this._container(name); id = c?.slots[parseInt(slotEl.dataset.i, 10)]?.id; }
+    }
+    if (!id || this.cursorStack) { tip.classList.add('hidden'); return; }
+    tip.innerHTML = this._tooltipFor(id);
+    tip.classList.remove('hidden');
+    const pad = 14;
+    let x = e.clientX + pad, y = e.clientY + pad;
+    const r = tip.getBoundingClientRect();
+    if (x + r.width > innerWidth) x = e.clientX - r.width - pad;
+    if (y + r.height > innerHeight) y = e.clientY - r.height - pad;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
   }
 
   wearWarmth() {

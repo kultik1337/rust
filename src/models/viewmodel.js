@@ -42,25 +42,66 @@ export class Viewmodel {
     const skin = MAT.skin(0xc98d5a);
     const sleeve = MAT.cloth(0x6a5330);
 
-    // Forearm (sleeve) angled forward.
-    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.06, 0.28, 4, 8), sleeve);
-    forearm.position.set(0, -0.02, 0.12);
-    forearm.rotation.x = 1.15;
+    // Forearm (rolled sleeve) angled forward toward the camera.
+    const forearm = new THREE.Mesh(new THREE.CapsuleGeometry(0.055, 0.26, 5, 10), sleeve);
+    forearm.position.set(0, -0.03, 0.12);
+    forearm.rotation.x = 1.2;
     arm.add(forearm);
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.07, 0.05, 10), sleeve);
+    cuff.position.set(0, 0.02, 0.0); cuff.rotation.x = 1.2;
+    arm.add(cuff);
 
-    // Wrist/hand.
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.06, 0.12), skin);
-    hand.position.set(0, 0.12, -0.05);
+    // Hand assembly (built pointing up out of the wrist, then rotated to grip).
+    const hand = new THREE.Group();
+    hand.position.set(0, 0.1, -0.02);
+
+    // Palm: a rounded box (bevelled by a squashed sphere on top).
+    const palm = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.045, 0.075), skin);
+    palm.position.y = 0.02;
+    const palmTop = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), skin);
+    palmTop.scale.set(0.9, 0.42, 0.78); palmTop.position.y = 0.035;
+    hand.add(palm, palmTop);
+
+    // A curled finger: two tapered segments with a knuckle bend.
+    const makeFinger = (x, len, r, spread, curl) => {
+      const base = new THREE.Group();
+      base.position.set(x, 0.05, 0.02);
+      base.rotation.z = spread;
+      base.rotation.x = -0.5 - curl;                 // first knuckle bend
+      const seg1 = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 8), skin);
+      seg1.position.y = len / 2; base.add(seg1);
+      const knuckle = new THREE.Mesh(new THREE.SphereGeometry(r * 1.05, 6, 5), skin);
+      knuckle.position.y = len; base.add(knuckle);
+      const tip = new THREE.Group();
+      tip.position.y = len; tip.rotation.x = -0.9 - curl; // second joint curls further
+      const seg2 = new THREE.Mesh(new THREE.CapsuleGeometry(r * 0.82, len * 0.8, 4, 8), skin);
+      seg2.position.y = (len * 0.8) / 2; tip.add(seg2);
+      base.add(tip);
+      return base;
+    };
+
+    // Four fingers fanned across the front of the palm, curling into a grip.
+    const fx = [-0.03, -0.01, 0.012, 0.032];
+    const flen = [0.055, 0.062, 0.058, 0.05];
+    for (let i = 0; i < 4; i++) hand.add(makeFinger(fx[i], flen[i], 0.011, (i - 1.5) * 0.06, 0.15 * i * 0.1));
+
+    // Thumb: comes off the side, wraps toward the grip.
+    const thumb = new THREE.Group();
+    thumb.position.set(-0.045, 0.0, 0.02);
+    thumb.rotation.set(-0.3, 0, 0.9);
+    const t1 = new THREE.Mesh(new THREE.CapsuleGeometry(0.013, 0.045, 4, 8), skin);
+    t1.position.y = 0.022; thumb.add(t1);
+    const tt = new THREE.Group(); tt.position.y = 0.045; tt.rotation.x = -0.7;
+    const t2 = new THREE.Mesh(new THREE.CapsuleGeometry(0.011, 0.035, 4, 8), skin);
+    t2.position.y = 0.017; tt.add(t2); thumb.add(tt);
+    hand.add(thumb);
+
+    // Tilt the whole hand so the palm faces the grip axis.
+    hand.rotation.x = 0.5;
     arm.add(hand);
-    // A couple of finger nubs curling over a grip.
-    for (let i = 0; i < 3; i++) {
-      const f = new THREE.Mesh(new THREE.CapsuleGeometry(0.014, 0.05, 3, 5), skin);
-      f.position.set((i - 1) * 0.025, 0.15, -0.02);
-      f.rotation.x = -0.6;
-      arm.add(f);
-    }
+
     arm.traverse((o) => { if (o.isMesh) o.castShadow = false; });
-    arm.scale.x = side; // mirror the left arm
+    arm.scale.x = side; // mirror for the left arm
     return arm;
   }
 

@@ -91,7 +91,10 @@ export class Terrain {
         const z = -half + j * step;
         const y = this.heights[idx];
         pos[idx * 3] = x; pos[idx * 3 + 1] = y; pos[idx * 3 + 2] = z;
-        uv[idx * 2] = i / seg; uv[idx * 2 + 1] = j / seg;
+        // World-space UVs so the detail texture tiles at a fixed ~5 m scale
+        // regardless of grid resolution (no stretching).
+        const TILE = 5;
+        uv[idx * 2] = x / TILE; uv[idx * 2 + 1] = z / TILE;
 
         // Slope from local gradient.
         const hL = this.heights[j * N + Math.max(0, i - 1)];
@@ -134,7 +137,7 @@ export class Terrain {
       map: tex.map,
       roughnessMap: tex.roughnessMap,
       normalMap: tex.normalMap,
-      normalScale: new THREE.Vector2(0.8, 0.8),
+      normalScale: new THREE.Vector2(0.45, 0.45),
       roughness: 1.0,
       metalness: 0.0,
     });

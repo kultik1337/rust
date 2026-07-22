@@ -17,6 +17,8 @@ import { DropManager } from './systems/drops.js';
 import { DeployManager } from './systems/deployables.js';
 import { BuildSystem } from './systems/building.js';
 import { CombatSystem } from './systems/combat.js';
+import { Particles } from './systems/particles.js';
+import { AudioEngine } from './systems/audio.js';
 import { IconRenderer } from './ui/icons.js';
 import { HUD } from './ui/hud.js';
 import { ITEMS } from './data/items.js';
@@ -55,7 +57,7 @@ class Game {
     const spawn = this.terrain.findSpawn();
     this.resources.clearAround(spawn, 5);
     this.player.teleport(spawn);
-    this.player.takeDamage = (dmg, cause) => { this.survival.damage(dmg, cause); this.hud.hurtFlash(); };
+    this.player.takeDamage = (dmg, cause) => { this.survival.damage(dmg, cause); this.hud.hurtFlash(); this.audio?.hurt(); };
 
     this.viewmodel = new Viewmodel(this.engine);
 
@@ -71,12 +73,15 @@ class Game {
     this.drops = new DropManager(scene, this.terrain);
     this.deploy = new DeployManager(scene, this.terrain, this.physics);
     this.build = new BuildSystem(scene, this.terrain, this.physics, this.inventory);
+    this.particles = new Particles(scene);
+    this.audio = new AudioEngine();
 
     this.icons = new IconRenderer();
     this.hud = new HUD({
       icons: this.icons,
       inventory: this.inventory,
       crafting: this.crafting,
+      audio: this.audio,
       getStations: () => this.deploy.stationsNear(this.player.pos),
       onDropWorld: (stack) => this._dropStack(stack),
     });
@@ -85,6 +90,7 @@ class Game {
       scene, camera: this.engine.camera, viewmodel: this.viewmodel,
       resources: this.resources, animals: this.animals, drops: this.drops,
       inventory: this.inventory, terrain: this.terrain, ui: this.hud,
+      particles: this.particles, audio: this.audio,
     });
 
     this._giveStartingKit();
@@ -160,7 +166,7 @@ class Game {
     const id = this._heldId();
     const def = id ? ITEMS[id] : null;
     if (!def) return;
-    if (this._buildMode()) { if (this.build.tryPlace()) this.hud.toast('Placed'); return; }
+    if (this._buildMode()) { if (this.build.tryPlace()) { this.hud.toast('Placed'); this.audio?.place(); } return; }
     if (def.category === 'deploy') return this._placeDeployable(id);
     if (def.ranged) { this.viewmodel.aiming = true; return; }
     if (def.category === 'food') return this._consumeSelected();
@@ -171,6 +177,7 @@ class Game {
     if (!pt) { this.hud.toast('No valid spot'); return; }
     this.deploy.place(id, pt, this.player.yaw);
     this.inventory.remove(id, 1);
+    this.audio?.place();
     this.hud.toast(`Placed ${ITEMS[id].name}`);
   }
 
@@ -203,16 +210,41 @@ class Game {
     this.drops.spawn(stack.id, stack.count, pos, 0.2);
   }
 
+  // Gather only nearby interactable roots so raycasts stay cheap.
+  _nearbyInteractables(range) {
+    const list = [];
+    const p = this.player.pos; const r2 = range * range;
+    for (const g of this.resources.resources) {
+      if (!g.visible) continue;
+      const dx = g.position.x - p.x, dz = g.position.z - p.z;
+      if (dx * dx + dz * dz < r2) list.push(g);
+    }
+    for (const it of this.deploy.items) {
+      const dx = it.group.position.x - p.x, dz = it.group.position.z - p.z;
+      if (dx * dx + dz * dz < r2) list.push(it.group);
+    }
+    for (const a of this.animals.animals) {
+      if (a.dead) continue;
+      const dx = a.mesh.position.x - p.x, dz = a.mesh.position.z - p.z;
+      if (dx * dx + dz * dz < r2) list.push(a.mesh);
+    }
+    return list;
+  }
+
+  // Ray-march the analytic terrain height instead of raycasting the mesh — the
+  // terrain has ~166k triangles, so a mesh raycast every frame was a big cost.
   _aimGround(maxDist = 6) {
     const cam = this.engine.camera;
-    this._raycaster.set(cam.position, cam.getWorldDirection(new THREE.Vector3()));
-    this._raycaster.far = maxDist;
-    const targets = [this.terrain.mesh, ...this.build.placed];
-    const hits = this._raycaster.intersectObjects(targets, true);
-    if (hits.length) return hits[0].point.clone();
-    // Fallback: project a point in front onto the terrain height.
-    const dir = cam.getWorldDirection(new THREE.Vector3());
-    const p = cam.position.clone().add(dir.multiplyScalar(maxDist * 0.6));
+    const o = cam.position;
+    const d = cam.getWorldDirection(new THREE.Vector3());
+    const step = 0.3;
+    for (let t = 0.3; t < maxDist; t += step) {
+      const x = o.x + d.x * t, y = o.y + d.y * t, z = o.z + d.z * t;
+      if (y <= this.terrain.heightAt(x, z)) {
+        return new THREE.Vector3(x, this.terrain.heightAt(x, z), z);
+      }
+    }
+    const p = o.clone().add(d.multiplyScalar(maxDist * 0.6));
     p.y = this.terrain.heightAt(p.x, p.z);
     return p;
   }
@@ -221,7 +253,7 @@ class Game {
     const cam = this.engine.camera;
     this._raycaster.set(cam.position, cam.getWorldDirection(new THREE.Vector3()));
     this._raycaster.far = maxDist;
-    const hits = this._raycaster.intersectObjects(this.engine.scene.children, true);
+    const hits = this._raycaster.intersectObjects(this._nearbyInteractables(maxDist + 1), true);
     for (const h of hits) {
       const root = findEntityRoot(h.object);
       if (root && root.userData.type) return root;
@@ -287,18 +319,24 @@ class Game {
     this.engine.renderer.toneMappingExposure = 0.5 + day * 0.55;
     this.engine.bloom.strength = 0.35 + (1 - day) * 0.35;
     this.ocean.update(dt, this.sky.sunDir, this.sky.sun.color);
-    this.resources.update(dt);
+    this.resources.update(dt, this.player?.pos);
 
     if (playing) {
       const exhausted = this.survival.hunger <= 0 || this.survival.thirst <= 0;
+      const wasInWater = this.player.inWater;
       this.player.update(dt, this.input, { exhausted, lockSprint: exhausted });
+      // Splash feedback when entering the water.
+      if (this.player.inWater && !wasInWater) {
+        const fp = this.player.pos.clone(); fp.y = 0.1;
+        this.particles.splash(fp); this.audio?.splash();
+      }
 
       // Continuous primary use (hold to keep chopping).
       if (this.input.isButton(0) && !ITEMS[this._heldId()]?.ranged) this.combat.usePrimary(this.viewmodel.aiming);
 
       this.animals.update(dt, this.player, (id, n, pos) => this.drops.spawn(id, n, pos));
       this.combat.update(dt);
-      this.drops.update(dt, this.player, this.inventory, () => {});
+      this.drops.update(dt, this.player, this.inventory, () => this.audio?.pickup());
 
       // Survival environment.
       const warmth = this.deploy.warmthAt(this.player.pos) + (this._heldId() === 'torch' ? 4 : 0);
@@ -311,14 +349,38 @@ class Game {
         inWater: this.player.inWater,
       });
 
-      this._updateInteractionPrompt();
+      // Interaction prompt is throttled — it doesn't need per-frame precision.
+      this._promptTick = (this._promptTick || 0) + 1;
+      if (this._promptTick % 4 === 0) this._updateInteractionPrompt();
       if (this._buildMode()) this.build.updateGhost(this._aimGround(6));
     }
 
     this.deploy.update(dt);
+    this.particles.update(dt);
+
+    // Rising embers from nearby fires.
+    if (this.player) {
+      for (const it of this.deploy.items) {
+        if (!it.fire) continue;
+        if (it.group.position.distanceTo(this.player.pos) < 34 && Math.random() < dt * 6) {
+          const ep = it.group.position.clone(); ep.y += it.kind === 'furnace' ? 0.5 : 0.35;
+          this.particles.ember(ep);
+        }
+      }
+    }
 
     // Viewmodel: reflect selected item + animate.
     this._updateViewmodel(dt);
+
+    // Ambient + positional audio.
+    if (this.player) {
+      const nearFire = this.deploy.warmthAt(this.player.pos) + (this._heldId() === 'torch' ? 4 : 0);
+      this.audio.update(dt, {
+        moving: playing && this.player.moving, grounded: this.player.grounded,
+        speed: this.player.speed, nearFire, dayFactor: this.sky.dayFactor,
+      });
+      this.hud.setCompass(this.player.yaw);
+    }
 
     // HUD.
     this.hud.renderVitals(this.survival);
@@ -389,6 +451,7 @@ async function boot() {
   const btn = document.getElementById('play-btn');
   const play = () => {
     start.classList.add('hidden');
+    game.audio?.init();
     game.input.requestLock();
     if (!game._started) { game._started = true; game.start(); }
     else game.playing = true;

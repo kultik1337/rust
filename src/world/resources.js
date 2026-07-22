@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { makeRNG } from '../core/noise.js';
+import { mergeByMaterial } from '../models/merge.js';
 import {
   makePineTree, makeBroadleafTree, makeDeadTree, makeRock, makeOreNode, makeBush, makeHemp,
 } from '../models/nature.js';
@@ -18,6 +19,7 @@ export class ResourceManager {
   }
 
   _place(group, x, z) {
+    group = mergeByMaterial(group);       // collapse to 1 mesh per material
     const y = this.terrain.heightAt(x, z);
     group.position.set(x, y, z);
     group.rotation.y = this.rng() * Math.PI * 2;
@@ -124,10 +126,23 @@ export class ResourceManager {
     group.userData._fallAxis = Math.random() * Math.PI * 2;
   }
 
-  update(dt) {
+  update(dt, playerPos) {
+    // Distance culling: hide resources beyond view, and only let nearby ones
+    // cast shadows. This is the main runtime cost saver in dense forest.
+    const cull2 = 165 * 165, shadow2 = 70 * 70;
     for (let i = this.resources.length - 1; i >= 0; i--) {
       const g = this.resources[i];
       const ud = g.userData;
+      if (playerPos) {
+        const dx = g.position.x - playerPos.x, dz = g.position.z - playerPos.z;
+        const d2 = dx * dx + dz * dz;
+        const vis = d2 < cull2;
+        if (g.visible !== vis) g.visible = vis;
+        if (vis) {
+          const cast = d2 < shadow2;
+          if (ud._cast !== cast) { ud._cast = cast; g.traverse((o) => { if (o.isMesh) o.castShadow = cast; }); }
+        }
+      }
       if (ud._shake > 0) {
         ud._shake -= dt * 0.6;
         g.rotation.z = Math.sin(performance.now() * 0.05) * ud._shake * 0.3;

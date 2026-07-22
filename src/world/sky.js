@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { clamp, lerp, smoothstep } from '../core/noise.js';
 
 // Drives the whole day/night cycle: atmospheric sky shader, sun + moon
@@ -62,6 +63,7 @@ export class SkySystem {
     scene.add(this.sunDisc, this.moonDisc);
 
     this._buildStars();
+    this._buildClouds();
 
     this.sunDir = new THREE.Vector3(0, 1, 0);
     this.isNight = false;
@@ -90,8 +92,35 @@ export class SkySystem {
     this.scene.add(this.stars);
   }
 
-  setTime(h) { this.timeOfDay = ((h % 24) + 24) % 24; }
+  _buildClouds() {
+    // A drifting layer of soft, unlit cloud puffs. Each cloud is a few merged
+    // deformed spheres → one draw call per cloud. Tinted by time of day.
+    this.cloudMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, fog: false, transparent: true, opacity: 0.85, depthWrite: false,
+    });
+    this.clouds = new THREE.Group();
+    const N = 16;
+    for (let i = 0; i < N; i++) {
+      const geos = [];
+      const puffs = 3 + Math.floor(Math.random() * 4);
+      for (let j = 0; j < puffs; j++) {
+        const r = 18 + Math.random() * 26;
+        const g = new THREE.SphereGeometry(r, 8, 6);
+        g.scale(1.4, 0.5, 1.1);
+        g.translate((Math.random() - 0.5) * 70, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 40);
+        geos.push(g);
+      }
+      const merged = mergeGeometries(geos, false);
+      const cloud = new THREE.Mesh(merged, this.cloudMat);
+      const a = Math.random() * Math.PI * 2, rad = 200 + Math.random() * 1300;
+      cloud.position.set(Math.cos(a) * rad, 150 + Math.random() * 90, Math.sin(a) * rad);
+      cloud.userData.drift = 4 + Math.random() * 4;
+      this.clouds.add(cloud);
+    }
+    this.scene.add(this.clouds);
+  }
 
+  setTime(h) { this.timeOfDay = ((h % 24) + 24) % 24; }
   update(dt, playerPos) {
     if (!this.paused) {
       this.timeOfDay = (this.timeOfDay + (dt / this.dayLength) * 24) % 24;
@@ -154,6 +183,14 @@ export class SkySystem {
     // Stars fade in after dusk.
     this.stars.material.opacity = clamp(1 - day * 1.6, 0, 1);
     this.stars.position.set(cx, cy, cz);
+
+    // Clouds drift and are tinted from moonlit-grey to sun-warmed white.
+    for (const c of this.clouds.children) {
+      c.position.x += c.userData.drift * dt;
+      if (c.position.x > cx + 1500) c.position.x -= 3000;
+    }
+    this.cloudMat.color.setRGB(lerp(0.28, 1.0, day), lerp(0.31, 0.98, day), lerp(0.4, 0.95, day));
+    this.cloudMat.opacity = lerp(0.55, 0.85, day);
 
     // Ambient temperature: warm midday, cold pre-dawn night.
     this.ambientTemp = lerp(4, 26, day) - 2 * Math.max(0, -elev);

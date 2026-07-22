@@ -24,6 +24,8 @@ export class HUD {
       invHotbar: document.getElementById('inv-hotbar'),
       invWear: document.getElementById('inv-wear'),
       craftList: document.getElementById('craft-list'),
+      craftTabs: document.getElementById('craft-tabs'),
+      charStats: document.getElementById('char-stats'),
       tooltip: document.getElementById('tooltip'),
       extPanel: document.getElementById('ext-panel'),
       extGrid: document.getElementById('ext-grid'),
@@ -37,6 +39,7 @@ export class HUD {
     this.open = false;
     this.cursorStack = null;    // { id, count, dur }
     this.extInstance = null;    // deployable instance whose container is open
+    this.craftFilter = 'All';
     this._toasts = [];
 
     this.inv.onChange = () => { this.renderHotbar(); if (this.open) this.renderScreen(); };
@@ -190,10 +193,17 @@ export class HUD {
     this._renderGrid(this.el.invGrid, this.inv.main, 'main');
     this._renderGrid(this.el.invHotbar, this.inv.hotbar, 'hotbar', true);
     this._renderWear();
+    this._renderCharStats();
     if (this.extInstance) this._renderGrid(this.el.extGrid, this.extInstance.container, 'ext');
+    this._renderCraftTabs();
     this.renderCrafting();
-    // Also refresh the always-on bottom hotbar.
     this.renderHotbar();
+  }
+
+  _renderCharStats() {
+    let armor = 0, warmth = 0;
+    for (const s of Object.values(this.inv.wear)) if (s) { armor += ITEMS[s.id]?.armor || 0; warmth += ITEMS[s.id]?.warmth || 0; }
+    this.el.charStats.innerHTML = `<div>Armor: <b>${armor}</b></div><div>Warmth: <b>+${warmth}</b></div>`;
   }
 
   _renderGrid(container, model, name, keyed = false) {
@@ -217,18 +227,40 @@ export class HUD {
       const slot = document.createElement('div');
       slot.className = 'slot'; slot.dataset.c = 'wear'; slot.dataset.i = slotName;
       if (s) this._fillSlot(slot, s);
-      else { const l = document.createElement('span'); l.className = 'key'; l.textContent = slotName[0].toUpperCase(); slot.appendChild(l); }
+      const label = document.createElement('span'); label.className = 'wlabel'; label.textContent = slotName;
+      slot.appendChild(label);
       g.appendChild(slot);
     }
   }
 
   _buildCraftListStructure() { /* rebuilt each render */ }
 
+  _recipeTab(recipe) {
+    const cat = ITEMS[Object.keys(recipe.out)[0]]?.category;
+    if (cat === 'tool' || cat === 'weapon' || cat === 'build' || cat === 'ammo') return 'Tools';
+    if (cat === 'deploy') return 'Deploy';
+    if (cat === 'wear') return 'Wear';
+    return 'Misc';
+  }
+
+  _renderCraftTabs() {
+    const tabs = ['All', 'Tools', 'Deploy', 'Wear', 'Misc'];
+    this.el.craftTabs.innerHTML = '';
+    for (const name of tabs) {
+      const btn = document.createElement('button');
+      btn.textContent = name;
+      if (this.craftFilter === name) btn.classList.add('active');
+      btn.addEventListener('mousedown', (e) => { e.stopPropagation(); this.craftFilter = name; this._renderCraftTabs(); this.renderCrafting(); });
+      this.el.craftTabs.appendChild(btn);
+    }
+  }
+
   renderCrafting() {
     const list = this.el.craftList;
     list.innerHTML = '';
     const stations = this.getStations();
     for (const recipe of this.crafting.list()) {
+      if (this.craftFilter !== 'All' && this._recipeTab(recipe) !== this.craftFilter) continue;
       const can = this.crafting.canAfford(recipe);
       const station = this.crafting.hasStation(recipe, stations);
       const row = document.createElement('div');

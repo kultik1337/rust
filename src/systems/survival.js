@@ -36,7 +36,7 @@ export class Survival {
 
   update(dt, ctx) {
     if (!this.alive) return;
-    const { ambientTemp = 15, fireWarmth = 0, wearWarmth = 0, sprinting = false, inWater = false, moving = false } = ctx;
+    const { ambientTemp = 15, fireWarmth = 0, wearWarmth = 0, sprinting = false, inWater = false, moving = false, wet = 0 } = ctx;
 
     // Metabolic drain (faster while exerting).
     const exert = sprinting ? 2.2 : moving ? 1.2 : 1.0;
@@ -46,6 +46,7 @@ export class Survival {
     // Temperature comfort tends toward a target set by environment + gear + fire.
     let target = 50 + (ambientTemp - 14) * 2.2 + fireWarmth * 2.4 + wearWarmth * 1.6;
     if (inWater) target -= 35;
+    target -= wet * 22;                 // getting rained on chills you (unless near fire)
     target = clamp(target, -10, 105);
     this.temp = lerp(this.temp, target, clamp(0.35 * dt, 0, 1));
 

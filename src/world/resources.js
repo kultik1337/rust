@@ -41,9 +41,9 @@ export class ResourceManager {
     const T = this.terrain, rng = this.rng;
     const R = T.worldRadius;
 
-    const tries = 5000;
+    const tries = 12000;
     let trees = 0, rocks = 0, ore = 0, bushes = 0, hemp = 0, dead = 0;
-    const LIMITS = { trees: 420, rocks: 170, ore: 44, bushes: 170, hemp: 44, dead: 40 };
+    const LIMITS = { trees: 760, rocks: 300, ore: 80, bushes: 320, hemp: 90, dead: 80 };
 
     for (let i = 0; i < tries; i++) {
       const a = rng() * Math.PI * 2;
@@ -129,7 +129,7 @@ export class ResourceManager {
   update(dt, playerPos) {
     // Distance culling: hide resources beyond view, and only let nearby ones
     // cast shadows. This is the main runtime cost saver in dense forest.
-    const cull2 = 165 * 165, shadow2 = 70 * 70;
+    const cull2 = 210 * 210, shadow2 = 75 * 75;
     for (let i = this.resources.length - 1; i >= 0; i--) {
       const g = this.resources[i];
       const ud = g.userData;

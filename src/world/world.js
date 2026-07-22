@@ -8,12 +8,12 @@ export class Terrain {
   constructor(scene, seed = 1337) {
     this.scene = scene;
     this.noise = new Noise(seed);
-    this.size = 720;                 // world extent (metres) on each axis
-    this.segments = 288;             // grid resolution
+    this.size = 1600;                // world extent (metres) on each axis — big island
+    this.segments = 400;             // grid resolution (~4 m cells)
     this.step = this.size / this.segments;
     this.half = this.size / 2;
     this.seaLevel = 0;
-    this.worldRadius = 300;          // island radius; beyond this it becomes ocean
+    this.worldRadius = 720;          // island radius; beyond this it becomes ocean
 
     const N = this.segments + 1;
     this.N = N;
@@ -31,24 +31,27 @@ export class Terrain {
     this._buildMesh();
   }
 
-  // Analytic height used to fill the grid. Combines a continent shape, rolling
-  // hills, and ridged mountains, then applies a radial island mask so the land
-  // sinks into ocean toward the edges.
+  // Analytic height used to fill the grid. Tuned for a large island that is
+  // mostly gentle plains, with occasional hills and rare, dramatic mountains.
   _computeHeight(x, z) {
     const n = this.noise;
     const d = Math.hypot(x, z) / this.worldRadius;
-    const mask = smoothstep(1.15, 0.32, d);
+    const mask = smoothstep(1.12, 0.28, d);
 
-    const continent = n.fbm(x * 0.0055, z * 0.0055, 5);          // -1..1
-    const hills = n.fbm(x * 0.02 + 20, z * 0.02 + 20, 4) * 0.5;
-    const ridge = n.ridged(x * 0.011 + 50, z * 0.011 + 50, 5);   // 0..1
-    const mountainMask = smoothstep(0.15, 0.7, continent);
+    const continent = n.fbm(x * 0.0030, z * 0.0030, 5);          // -1..1, big landmass shape
+    const plains = n.fbm(x * 0.010 + 11, z * 0.010 + 11, 3);     // gentle rolling
+    const ridge = n.ridged(x * 0.0072 + 50, z * 0.0072 + 50, 5); // 0..1 sharp ridges
+    // Mountains only appear where the continent is high → they're rare.
+    const mountainMask = smoothstep(0.52, 0.9, continent);
 
-    let h = continent * 15 + hills * 5 + ridge * mountainMask * 42;
-    // Beaches: flatten a band just above sea level for nicer shorelines.
-    h = lerp(h, h * 0.35, smoothstep(3.5, 0.5, Math.abs(h)) * 0.4);
+    // Base is broad and low; plains barely undulate; mountains spike rarely.
+    let h = continent * 7 + plains * 1.8 + ridge * mountainMask * 48;
+    // Flatten the mid-range so most of the land reads as open plains.
+    h = lerp(h, h * 0.45, smoothstep(1.5, 9, Math.abs(h)) * (1 - mountainMask) * 0.7);
+    // Beaches: gentle band just above sea level.
+    h = lerp(h, h * 0.4, smoothstep(3.0, 0.5, Math.abs(h)) * 0.4);
     // Island falloff.
-    h = (h + 7) * mask - 7;
+    h = (h + 6) * mask - 6;
     return h;
   }
 

@@ -357,6 +357,29 @@ After the first playthrough, six issues were addressed:
    - **Drifting clouds**, a **compass** strip, **fall damage**, and a pulsing
      **low-health vignette**.
 
+## Revision 3 — bigger world, snapping, weather
+
+- **Bigger, flatter world.** The island grew from 720 m to **1600 m** across (radius
+  720 m) and the terrain generator was retuned so broad **plains** dominate, with
+  hills gentler and mountains rare (`world/world.js`). Resource counts and draw
+  distance scale up; culling keeps it smooth.
+- **Rounder hands.** The boxy palm was replaced with rounded ellipsoids so there
+  are no squares left in the viewmodel.
+- **Building that magnet-snaps.** Adjacent foundations now snap to the *same top
+  level* as their neighbours, so a floor stays flat across bumpy ground instead of
+  stepping up. Foundations sit grounded via a procedural **skirt** down to the
+  terrain (capped so slopes don't make giant pillars), and the upside-down-looking
+  corner posts were removed (`systems/building.js`, `models/buildings.js`).
+- **Inventory, take two.** A single framed modal with a title bar, a Character
+  panel (silhouette + wear slots + armor/warmth), the backpack, an interactive
+  belt row, and a Crafting column with **category tabs**.
+- **Global surprise — weather.** A `Weather` system cycles clear → cloudy → rain →
+  storm. Rain is one instanced-mesh of streaks; storms fire **lightning** flashes
+  with delayed **thunder** (synthesised), rain hiss is added to the audio bed, and
+  being caught in the rain chills you (feeds the temperature vital). Plus **shooting
+  stars** at night and a glowing **Beacon** landmark that anchors the big map and
+  guides you home after dark.
+
 ## Quiz
 
 <details>

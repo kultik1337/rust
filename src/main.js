@@ -19,6 +19,8 @@ import { BuildSystem } from './systems/building.js';
 import { CombatSystem } from './systems/combat.js';
 import { Particles } from './systems/particles.js';
 import { AudioEngine } from './systems/audio.js';
+import { Weather } from './systems/weather.js';
+import { makeBeacon } from './models/landmark.js';
 import { IconRenderer } from './ui/icons.js';
 import { HUD } from './ui/hud.js';
 import { ITEMS } from './data/items.js';
@@ -51,7 +53,7 @@ class Game {
     this.resources.populate();
 
     this.animals = new AnimalManager(scene, this.terrain);
-    this.animals.populate(42);
+    this.animals.populate(70);
 
     this.player = new Player(this.engine.camera, this.physics);
     const spawn = this.terrain.findSpawn();
@@ -75,6 +77,8 @@ class Game {
     this.build = new BuildSystem(scene, this.terrain, this.physics, this.inventory);
     this.particles = new Particles(scene);
     this.audio = new AudioEngine();
+    this.weather = new Weather(scene, this.sky, this.engine, this.audio);
+    this._placeBeacon();
 
     this.icons = new IconRenderer();
     this.hud = new HUD({
@@ -99,6 +103,30 @@ class Game {
     // Warm up icon cache for starting items so the first frame has no hitch.
     for (const id of Object.keys(ITEMS)) { try { this.icons.get(id); } catch (e) {} }
     this.hud.renderHotbar();
+  }
+
+  _placeBeacon() {
+    const T = this.terrain;
+    // Find a prominent-ish spot a bit inland to host the landmark.
+    let best = null;
+    for (let i = 0; i < 3000; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = Math.random() * T.worldRadius * 0.45;
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      const h = T.heightAt(x, z), slope = T.slopeAt(x, z);
+      if (h > 6 && slope < 0.3) { const s = h - r * 0.02; if (!best || s > best.score) best = { x, z, h, score: s }; }
+    }
+    const v = best || { x: 0, z: 0, h: Math.max(6, T.heightAt(0, 0)) };
+    this.resources.clearAround(v, 6);
+    const beacon = makeBeacon();
+    beacon.position.set(v.x, v.h, v.z);
+    this.engine.scene.add(beacon);
+    this.beacon = beacon;
+    this.physics.addCylinder(v.x, v.z, beacon.userData.collider.radius, v.h, beacon.userData.collider.height, 'beacon');
+    // A reward cache at its base.
+    const box = this.deploy.place('box', { x: v.x + 3, y: v.h, z: v.z }, 0);
+    if (box?.container) { box.container.add('cloth', 40); box.container.add('metalFrag', 20); box.container.add('cookedMeat', 5); }
+    this._beaconPos = new THREE.Vector3(v.x, v.h, v.z);
   }
 
   _giveStartingKit() {
@@ -318,6 +346,15 @@ class Game {
     const day = this.sky.dayFactor ?? 1;
     this.engine.renderer.toneMappingExposure = 0.5 + day * 0.55;
     this.engine.bloom.strength = 0.35 + (1 - day) * 0.35;
+    // Weather runs after the sky so it can darken fog/sun/exposure.
+    this.weather.update(dt, this.engine.camera);
+    // Beacon glows at night and its shards slowly orbit.
+    if (this.beacon) {
+      const bl = this.beacon.userData.beaconLight;
+      bl.intensity = (2 + (1 - day) * 12) * (0.9 + Math.sin(performance.now() * 0.003) * 0.1);
+      this.beacon.userData.crystal.material.emissiveIntensity = 2.5 + (1 - day) * 2.5;
+      this.beacon.userData.shards.rotation.y += dt * 0.5;
+    }
     this.ocean.update(dt, this.sky.sunDir, this.sky.sun.color);
     this.resources.update(dt, this.player?.pos);
 
@@ -347,6 +384,7 @@ class Game {
         sprinting: this.player.sprinting,
         moving: this.player.moving,
         inWater: this.player.inWater,
+        wet: this.weather.wet,
       });
 
       // Interaction prompt is throttled — it doesn't need per-frame precision.
@@ -384,7 +422,7 @@ class Game {
 
     // HUD.
     this.hud.renderVitals(this.survival);
-    this.hud.setClock(this.sky.clockString());
+    this.hud.setClock(`${this.sky.clockString()}   ${this.weather.label()}`);
   }
 
   _updateViewmodel(dt) {

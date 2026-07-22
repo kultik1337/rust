@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { BUILD_MODELS, GRID, WALL_H } from '../models/buildings.js';
+import { BUILD_MODELS, GRID, WALL_H, SLAB_H } from '../models/buildings.js';
+import { MAT } from '../models/materials.js';
 
 const PIECES = ['foundation', 'wall', 'doorway', 'window', 'floor', 'stairs'];
 const COST = { foundation: 50, wall: 25, doorway: 30, window: 30, floor: 20, stairs: 25 };
@@ -67,11 +68,25 @@ export class BuildSystem {
     if (piece === 'foundation') {
       const { i, j } = this._cellOf(aimPoint.x, aimPoint.z);
       const c = this._cellCenter(i, j);
-      const h = this.terrain.heightAt(c.x, c.z);
-      t.x = c.x; t.z = c.z; t.y = h;
-      t.cell = { i, j };
-      const ok = !this.foundations.has(`${i},${j}`) && h > 0.5 && this.terrain.slopeAt(c.x, c.z) < 0.55;
-      t.ok = ok; t.ry = this.rot * Math.PI / 2;
+      const half = GRID / 2;
+      // Terrain under the four corners.
+      let hMax = -Infinity, hMin = Infinity;
+      for (const [dx, dz] of [[-half, -half], [half, -half], [-half, half], [half, half]]) {
+        const h = this.terrain.heightAt(c.x + dx, c.z + dz);
+        if (h > hMax) hMax = h; if (h < hMin) hMin = h;
+      }
+      // Magnet-snap: if any orthogonal neighbour is a foundation, match its top
+      // level so a contiguous platform stays flat over bumpy ground.
+      let top = null;
+      for (const nk of [`${i + 1},${j}`, `${i - 1},${j}`, `${i},${j + 1}`, `${i},${j - 1}`]) {
+        const f = this.foundations.get(nk);
+        if (f) { top = f.top; break; }
+      }
+      if (top === null) top = hMax + SLAB_H;      // first piece rests on the highest corner
+      t.x = c.x; t.z = c.z; t.top = top; t.y = top - SLAB_H;
+      t.cell = { i, j }; t.hMin = hMin;
+      t.ok = !this.foundations.has(`${i},${j}`) && hMax > 0.4;
+      if (!t.ok) t.reason = this.foundations.has(`${i},${j}`) ? 'occupied' : 'in water';
       return t;
     }
 
@@ -97,13 +112,13 @@ export class BuildSystem {
     }
 
     if (piece === 'floor') {
+      // A floor tile sits one storey above a foundation cell (on top of walls).
       const { i, j } = this._cellOf(aimPoint.x, aimPoint.z);
       const key = `${i},${j}`;
       const f = this.foundations.get(key);
       if (!f) { t.reason = 'need foundation'; return t; }
       const c = this._cellCenter(i, j);
-      t.x = c.x; t.z = c.z; t.y = f.top + WALL_H - (WALL_H); // model already offsets to WALL_H
-      t.y = f.top; // floor model sits WALL_H above its origin
+      t.x = c.x; t.z = c.z; t.y = f.top;   // floor model offsets its slab up by WALL_H
       t.cell = { i, j };
       t.ok = !this.floors.has(key);
       if (!t.ok) t.reason = 'occupied';
@@ -167,12 +182,25 @@ export class BuildSystem {
     group.position.set(t.x, t.y, t.z);
     group.rotation.y = t.ry;
     group.userData.id = 'build' + (this.placed.length + 1) + '_' + Date.now();
+
+    // Foundations get a procedural "skirt" down to the lowest corner so they
+    // look grounded on slopes instead of floating.
+    if (this.piece === 'foundation' && t.hMin !== undefined) {
+      let h = t.y - (t.hMin - 0.4);
+      if (h > 4.5) h = 4.5;              // cap so slopes don't make giant pillars
+      if (h > 0.15) {
+        const skirt = new THREE.Mesh(new THREE.BoxGeometry(GRID * 0.9, h, GRID * 0.9), MAT.wood(0x5c3f22));
+        skirt.position.y = -h / 2;
+        skirt.castShadow = true; skirt.receiveShadow = true;
+        group.add(skirt);
+      }
+    }
+
     this.scene.add(group);
     this.placed.push(group);
     this._registerColliders(group, t);
 
-    // Update occupancy bookkeeping.
-    if (this.piece === 'foundation') this.foundations.set(`${t.cell.i},${t.cell.j}`, { top: t.y + group.userData.height });
+    if (this.piece === 'foundation') this.foundations.set(`${t.cell.i},${t.cell.j}`, { top: t.top });
     else if (this.piece === 'floor') this.floors.add(`${t.cell.i},${t.cell.j}`);
     else if (this.piece === 'stairs') this.stairsSet.add(`${t.cell.i},${t.cell.j}`);
     else if (t.edge) this.edges.add(`${t.edge.i},${t.edge.j},${t.edge.e}`);

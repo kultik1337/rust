@@ -179,7 +179,7 @@ export class AnimalManager {
   }
 
   update(dt, player, spawnDrop) {
-    const cull2 = 190 * 190;
+    const cull2 = 230 * 230;
     for (let i = this.animals.length - 1; i >= 0; i--) {
       const a = this.animals[i];
       // Skip far animals entirely (both update + render) for performance.

@@ -9,7 +9,7 @@ import { MAT } from './materials.js';
 
 export const GRID = 3;         // footprint size
 export const WALL_H = 3;       // wall height
-const SLAB_H = 0.3;
+export const SLAB_H = 0.3;
 
 function box(w, h, d, mat) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
@@ -29,12 +29,12 @@ export function makeFoundation(tier = 'wood') {
   const slab = box(GRID, SLAB_H, GRID, mat);
   slab.position.y = SLAB_H / 2;
   g.add(slab);
-  // Corner posts to suggest structure.
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const post = box(0.28, 0.5, 0.28, mat);
-    post.position.set(sx * (GRID / 2 - 0.2), SLAB_H + 0.2, sz * (GRID / 2 - 0.2));
-    g.add(post);
-  }
+  // A slim top rim reads as a walkable surface (no upward posts — those looked
+  // like the piece was upside-down).
+  const rim = box(GRID, 0.06, GRID, tierMat(tier === 'wood' ? 'wood' : tier));
+  rim.position.y = SLAB_H + 0.02;
+  rim.scale.set(0.98, 1, 0.98);
+  g.add(rim);
   g.userData = {
     type: 'build', snapType: 'foundation', tier,
     platforms: [{ cx: 0, cz: 0, hx: GRID / 2, hz: GRID / 2, top: SLAB_H }],

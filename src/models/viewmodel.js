@@ -55,12 +55,12 @@ export class Viewmodel {
     const hand = new THREE.Group();
     hand.position.set(0, 0.1, -0.02);
 
-    // Palm: a rounded box (bevelled by a squashed sphere on top).
-    const palm = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.045, 0.075), skin);
-    palm.position.y = 0.02;
-    const palmTop = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), skin);
-    palmTop.scale.set(0.9, 0.42, 0.78); palmTop.position.y = 0.035;
-    hand.add(palm, palmTop);
+    // Palm: rounded ellipsoids only — no boxes.
+    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.055, 12, 10), skin);
+    palm.scale.set(1.2, 0.6, 0.92); palm.position.y = 0.028;
+    const heel = new THREE.Mesh(new THREE.SphereGeometry(0.046, 10, 8), skin);
+    heel.scale.set(1.0, 0.6, 0.85); heel.position.set(0, 0.0, 0.02);
+    hand.add(palm, heel);
 
     // A curled finger: two tapered segments with a knuckle bend.
     const makeFinger = (x, len, r, spread, curl) => {

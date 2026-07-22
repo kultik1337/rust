@@ -52,26 +52,32 @@
 
   <!-- Inventory + crafting screen -->
   <div id="inventory-screen" class="hidden">
-    <div class="inv-wrap">
-      <div class="col-left">
-        <div class="panel ext-panel hidden" id="ext-panel">
-          <div class="panel-head"><span id="ext-title">Container</span></div>
-          <div id="ext-grid" class="grid"></div>
+    <div class="inv-modal">
+      <div class="inv-topbar"><span class="title">Inventory</span><span class="close-hint">TAB / ESC to close</span></div>
+      <div class="inv-body">
+        <div class="col character">
+          <div class="panel-head"><span>Character</span></div>
+          <div class="char-doll">
+            <div class="silhouette">
+              <div class="sil-head"></div><div class="sil-torso"></div><div class="sil-legs"></div>
+            </div>
+            <div id="inv-wear" class="wear-col"></div>
+          </div>
+          <div class="char-stats" id="char-stats"></div>
         </div>
-        <div class="panel inv-panel">
-          <div class="panel-head"><span>Inventory</span><span class="hint">drag items · shift-click to quick-move</span></div>
+        <div class="col mainc">
+          <div class="panel-head"><span>Backpack</span><span class="hint">drag · shift-click to move</span></div>
           <div id="inv-grid" class="grid"></div>
           <div class="belt-sep"><span>Belt</span></div>
           <div id="inv-hotbar" class="grid belt-row"></div>
+          <div class="ext-block hidden" id="ext-panel">
+            <div class="belt-sep"><span id="ext-title">Container</span></div>
+            <div id="ext-grid" class="grid"></div>
+          </div>
         </div>
-      </div>
-      <div class="col-right">
-        <div class="panel wear-panel">
-          <div class="panel-head"><span>Wearing</span></div>
-          <div id="inv-wear" class="grid small"></div>
-        </div>
-        <div class="panel craft-panel">
+        <div class="col crafting">
           <div class="panel-head"><span>Crafting</span></div>
+          <div id="craft-tabs" class="tabs"></div>
           <div id="craft-list"></div>
         </div>
       </div>

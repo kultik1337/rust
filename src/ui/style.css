@@ -96,60 +96,89 @@ canvas#game { display: block; width: 100vw; height: 100vh; }
 
 /* Inventory + crafting */
 #inventory-screen { position: fixed; inset: 0; display: flex; align-items: center;
-  justify-content: center; background: rgba(6,5,4,0.62); backdrop-filter: blur(3px); z-index: 20; }
+  justify-content: center; background: rgba(6,5,4,0.66); backdrop-filter: blur(4px); z-index: 20; }
 #inventory-screen.hidden, .hidden { display: none !important; }
-.inv-wrap { display: flex; gap: 16px; align-items: flex-start; }
-.col-left, .col-right { display: flex; flex-direction: column; gap: 16px; }
-.panel { background: linear-gradient(180deg, rgba(30,27,23,0.96), rgba(20,18,15,0.96));
-  border: 1px solid #4a4238; border-radius: 10px; padding: 0 0 14px;
-  box-shadow: 0 16px 50px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.04); overflow: hidden; }
-.panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  padding: 11px 16px; margin-bottom: 12px; font-size: 13px; font-weight: 700; letter-spacing: 1.2px;
-  text-transform: uppercase; color: #e7d8bd; background: rgba(0,0,0,0.35);
+
+.inv-modal { width: min(1120px, 95vw); background: linear-gradient(180deg, rgba(26,23,20,0.98), rgba(17,15,13,0.98));
+  border: 1px solid #524a3e; border-radius: 14px; box-shadow: 0 24px 70px rgba(0,0,0,0.7);
+  overflow: hidden; }
+.inv-topbar { display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; background: linear-gradient(180deg, rgba(217,119,47,0.16), rgba(0,0,0,0.0));
   border-bottom: 1px solid #4a4238; }
-.panel-head .hint { font-size: 10px; font-weight: 500; letter-spacing: 0.3px; text-transform: none; color: #8a8071; }
-.grid { display: grid; grid-template-columns: repeat(6, 62px); gap: 6px; padding: 0 16px; }
-.grid.small { grid-template-columns: repeat(2, 62px); }
-.craft-panel { width: 320px; }
-.wear-panel { }
-.inv-panel { }
+.inv-topbar .title { font-size: 16px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: #f0d9b0; }
+.inv-topbar .close-hint { font-size: 11px; color: #8a8071; letter-spacing: 1px; }
+.inv-body { display: flex; gap: 0; }
+.col { padding: 16px 18px; }
+.col.character { width: 220px; border-right: 1px solid #3a342c; }
+.col.mainc { flex: 1; border-right: 1px solid #3a342c; }
+.col.crafting { width: 340px; display: flex; flex-direction: column; }
 
-.belt-sep { display: flex; align-items: center; gap: 10px; margin: 14px 16px 8px; color: #b0a693;
+.panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin-bottom: 12px; font-size: 12px; font-weight: 700; letter-spacing: 1.4px;
+  text-transform: uppercase; color: #d8c6a8; }
+.panel-head .hint { font-size: 10px; font-weight: 500; letter-spacing: 0.3px; text-transform: none; color: #837a6b; }
+
+.grid { display: grid; grid-template-columns: repeat(6, 60px); gap: 7px; }
+.belt-sep { display: flex; align-items: center; gap: 10px; margin: 16px 0 9px; color: #b0a693;
   font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
-.belt-sep::before, .belt-sep::after { content: ''; flex: 1; height: 1px; background: #4a4238; }
-.belt-row .slot { border-color: #6b5a3e; box-shadow: inset 0 0 10px rgba(0,0,0,0.5), 0 0 0 1px rgba(217,119,47,0.15); }
+.belt-sep::before, .belt-sep::after { content: ''; flex: 1; height: 1px; background: #423b31; }
+.belt-row .slot { border-color: #7a6642; }
+.ext-block { margin-top: 4px; }
 
-.slot { width: 62px; height: 62px; background: radial-gradient(circle at 50% 35%, #33302a, #201d18);
-  border: 2px solid var(--slot-border); border-radius: 6px; position: relative; display: flex;
-  align-items: center; justify-content: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.55); }
-.slot:hover { border-color: #caa96a; }
-.slot img { width: 50px; height: 50px; image-rendering: auto; }
+.slot { width: 60px; height: 60px; background: radial-gradient(circle at 50% 32%, #3a362e, #211e18);
+  border: 2px solid #574e42; border-radius: 8px; position: relative; display: flex;
+  align-items: center; justify-content: center; box-shadow: inset 0 2px 6px rgba(0,0,0,0.5);
+  transition: transform 0.06s, border-color 0.1s; }
+.slot:hover { border-color: #d0ad68; transform: translateY(-1px); }
+.slot img { width: 50px; height: 50px; }
 .slot .count { position: absolute; right: 4px; bottom: 2px; font-size: 12px; font-weight: 800;
   color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000; }
 .slot .key { position: absolute; left: 4px; top: 2px; font-size: 10px; color: #b8ad9c; }
 .slot .dur { position: absolute; left: 5px; right: 5px; bottom: 3px; height: 3px; background: rgba(0,0,0,0.55); border-radius: 2px; }
 .slot .dur > i { display: block; height: 100%; background: linear-gradient(90deg,#6fbf5f,#c9d84a); border-radius: 2px; }
+#hotbar .slot.active, .belt-row .slot.active { border-color: var(--accent); box-shadow: 0 0 12px var(--accent); }
 
-#craft-list { display: flex; flex-direction: column; gap: 5px; padding: 0 12px; max-height: 62vh; overflow-y: auto; }
-.recipe { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 6px;
+/* Character column */
+.char-doll { display: flex; gap: 14px; align-items: center; }
+.silhouette { width: 86px; height: 150px; position: relative; opacity: 0.5;
+  background: rgba(255,255,255,0.02); border-radius: 10px; border: 1px solid #3a342c; }
+.sil-head { position: absolute; left: 50%; top: 12px; width: 26px; height: 26px; transform: translateX(-50%);
+  background: #6a6152; border-radius: 50%; }
+.sil-torso { position: absolute; left: 50%; top: 40px; width: 44px; height: 58px; transform: translateX(-50%);
+  background: #6a6152; border-radius: 12px 12px 8px 8px; }
+.sil-legs { position: absolute; left: 50%; top: 98px; width: 38px; height: 46px; transform: translateX(-50%);
+  background: #5a5246; border-radius: 8px; }
+.wear-col { display: flex; flex-direction: column; gap: 10px; }
+.wear-col .slot .wlabel { position: absolute; left: 50%; bottom: -15px; transform: translateX(-50%);
+  font-size: 9px; color: #8a8071; letter-spacing: 0.5px; }
+.char-stats { margin-top: 22px; font-size: 12px; color: #b7ac98; line-height: 1.9; }
+.char-stats b { color: #e7d8bd; }
+
+/* Crafting */
+.tabs { display: flex; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
+.tabs button { font-size: 11px; padding: 5px 10px; border-radius: 14px; border: 1px solid #4a4238;
+  background: rgba(255,255,255,0.03); color: #b7ac98; cursor: pointer; letter-spacing: 0.5px; }
+.tabs button.active { background: var(--accent); color: #1a120a; border-color: var(--accent); font-weight: 700; }
+#craft-list { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; max-height: 56vh; padding-right: 4px; }
+.recipe { display: flex; align-items: center; gap: 10px; padding: 7px; border-radius: 8px;
   background: rgba(255,255,255,0.03); border: 1px solid transparent; }
 .recipe:hover { background: rgba(255,255,255,0.07); border-color: #4a4238; }
 .recipe.locked { opacity: 0.5; }
-.recipe .ricon { width: 44px; height: 44px; background: #201d18; border: 1px solid var(--slot-border);
-  border-radius: 5px; display:flex; align-items:center; justify-content:center; flex: 0 0 auto; }
-.recipe .ricon img { width: 36px; height: 36px; }
+.recipe .ricon { width: 46px; height: 46px; background: #221e18; border: 1px solid #574e42;
+  border-radius: 7px; display:flex; align-items:center; justify-content:center; flex: 0 0 auto; }
+.recipe .ricon img { width: 38px; height: 38px; }
 .recipe .rmeta { flex: 1; min-width: 0; }
 .recipe .rname { font-size: 13px; font-weight: 600; color: #ece3d3; }
 .recipe .rcost { font-size: 10.5px; color: #9a917f; margin-top: 2px; }
 .recipe .rcost b { color: #d8c9a8; font-weight: 600; }
 .recipe .rcost .miss { color: #d8695a; }
 .recipe .rcraft { font-size: 12px; background: linear-gradient(180deg,#e08a3c,#c9772f); color: #1a120a;
-  border: none; padding: 7px 12px; border-radius: 5px; cursor: pointer; font-weight: 800; flex: 0 0 auto; }
+  border: none; padding: 8px 13px; border-radius: 6px; cursor: pointer; font-weight: 800; flex: 0 0 auto; }
 .recipe .rcraft:hover { filter: brightness(1.08); }
 .recipe.locked .rcraft { background: #4a453d; color: #8a8071; cursor: not-allowed; }
 
-#tooltip { position: fixed; z-index: 45; pointer-events: none; background: rgba(10,9,7,0.95);
-  border: 1px solid #5a5148; border-radius: 5px; padding: 6px 10px; font-size: 12px; color: #ece3d3;
+#tooltip { position: fixed; z-index: 45; pointer-events: none; background: rgba(10,9,7,0.96);
+  border: 1px solid #5a5148; border-radius: 6px; padding: 7px 11px; font-size: 12px; color: #ece3d3;
   box-shadow: 0 6px 20px rgba(0,0,0,0.6); max-width: 220px; }
 #tooltip .tname { font-weight: 700; color: #f0d9b0; }
 #tooltip .tcat { font-size: 10.5px; color: #9a917f; text-transform: capitalize; }

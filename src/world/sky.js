@@ -48,7 +48,8 @@ export class SkySystem {
     scene.add(this.hemi);
 
     // Fog — colour animated with the time of day for depth + mood.
-    this.fog = new THREE.FogExp2(0xbfd4e8, 0.0016);
+    this.baseFog = 0.0013;           // long draw distance for the big world
+    this.fog = new THREE.FogExp2(0xbfd4e8, this.baseFog);
     scene.fog = this.fog;
 
     // Visible sun disc (bright → blooms) and moon disc.
@@ -64,6 +65,7 @@ export class SkySystem {
 
     this._buildStars();
     this._buildClouds();
+    this.shootingStars = [];
 
     this.sunDir = new THREE.Vector3(0, 1, 0);
     this.isNight = false;
@@ -177,6 +179,7 @@ export class SkySystem {
     // Fog colour: deep blue at night → hazy blue-white by day.
     const fr = lerp(0.05, 0.75, day), fg = lerp(0.07, 0.83, day), fb = lerp(0.13, 0.9, day);
     this.fog.color.setRGB(fr, fg, fb);
+    this.fog.density = this.baseFog;   // reset so weather can modulate from a known base
     this.sunDisc.material.color.setRGB(1.0, lerp(0.6, 0.94, day), lerp(0.3, 0.8, day));
     this.sunDisc.visible = this.sunDir.y > -0.15;
 
@@ -192,8 +195,29 @@ export class SkySystem {
     this.cloudMat.color.setRGB(lerp(0.28, 1.0, day), lerp(0.31, 0.98, day), lerp(0.4, 0.95, day));
     this.cloudMat.opacity = lerp(0.55, 0.85, day);
 
+    // Shooting stars streak across the night sky.
+    if (day < 0.14 && Math.random() < dt * 0.22) this._spawnShootingStar(cx, cy, cz);
+    for (let i = this.shootingStars.length - 1; i >= 0; i--) {
+      const s = this.shootingStars[i];
+      s.life -= dt;
+      s.mesh.position.addScaledVector(s.vel, dt);
+      s.mesh.material.opacity = Math.max(0, s.life / s.maxLife);
+      if (s.life <= 0) { this.scene.remove(s.mesh); this.shootingStars.splice(i, 1); }
+    }
+
     // Ambient temperature: warm midday, cold pre-dawn night.
     this.ambientTemp = lerp(4, 26, day) - 2 * Math.max(0, -elev);
+  }
+
+  _spawnShootingStar(cx, cy, cz) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1, fog: false, toneMapped: false });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 46), mat);
+    const a = Math.random() * Math.PI * 2;
+    mesh.position.set(cx + Math.cos(a) * 500, cy + 260 + Math.random() * 120, cz + Math.sin(a) * 500);
+    const vel = new THREE.Vector3(-Math.cos(a) * 380 + (Math.random() - 0.5) * 120, -70 - Math.random() * 60, -Math.sin(a) * 380);
+    mesh.lookAt(mesh.position.clone().add(vel));
+    this.scene.add(mesh);
+    this.shootingStars.push({ mesh, vel, life: 1.1, maxLife: 1.1 });
   }
 
   clockString() {

@@ -20,6 +20,7 @@ export class AudioEngine {
     this.master.connect(this.ctx.destination);
     this._noise = this._makeNoise(2);
     this._startWind();
+    this._startRain();
   }
 
   _makeNoise(sec) {
@@ -42,6 +43,34 @@ export class AudioEngine {
     const lfo = this.ctx.createOscillator(); lfo.frequency.value = 0.08;
     const lfoG = this.ctx.createGain(); lfoG.gain.value = 200;
     lfo.connect(lfoG).connect(lp.frequency); lfo.start();
+  }
+
+  _startRain() {
+    const src = this.ctx.createBufferSource();
+    src.buffer = this._noise; src.loop = true;
+    const hp = this.ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2600;
+    const g = this.ctx.createGain(); g.gain.value = 0.0;
+    src.connect(hp).connect(g).connect(this.master);
+    src.start();
+    this._rainGain = g;
+  }
+
+  setRain(v) {
+    if (this._rainGain) this._rainGain.gain.setTargetAtTime(Math.max(0, v) * 0.16, this.ctx.currentTime, 0.4);
+  }
+
+  thunder() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    // Low rumble: filtered noise with a long decay + a couple of sub booms.
+    const src = this.ctx.createBufferSource(); src.buffer = this._noise;
+    const lp = this.ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 1.8);
+    src.connect(lp).connect(g).connect(this.master); src.start(t); src.stop(t + 2);
+    this._tone(60, 'sine', 1.4, 0.35, 38);
   }
 
   // --- primitive voices ---
